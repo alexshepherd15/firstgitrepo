@@ -1,0 +1,58 @@
+from pulp import *
+
+prob = LpProblem("Whiskas v1", LpMaximize)
+
+# Variables
+NS = LpVariable("Native Stream", 9000, 9000) # Native Stream
+Sweet = LpVariable("Sweet Stream", 0,6000) # Sweet blend Location
+Heavy = LpVariable("Heavy Stream", 0,4000) # Heavy blend Location
+Butane = LpVariable("Butane Blend", 0, 1000) # Butane blend location
+
+stream_volume = NS + Sweet + Heavy + Butane
+blend_cost = NS*300 + Sweet*300 + Heavy*200 + Butane*150
+
+# Price & Qualities Dictionary
+prices = {NS:300, Sweet:300, Heavy:200, Butane:150}
+densities = {NS:820, Sweet:825, Heavy:900, Butane:600}
+sulphur = {NS:.2, Sweet:.25, Heavy:4, Butane:0}
+
+# Set Objective Function with prices
+prob += stream_volume*300 # stream profit
+
+# Set Constraints
+
+prob += 820*NS + 825*Sweet + 900*Heavy + 600*Butane >= stream_volume*800 # Lower bound density constraint
+prob += 820*NS + 825*Sweet + 900*Heavy + 600*Butane <= stream_volume*825 # Upper bound density constraint
+prob += 0.2*NS + 0.25*Sweet + 4*Heavy + 0*Butane <= stream_volume*.5 # Upper bound sulphur constraint
+prob += 0.2*NS + 0.25*Sweet + 4*Heavy + 0*Butane >= 0 # Lower bound sulphur constraint
+
+# Write to LP & Solve
+prob.writeLP("WhiskasBlend.lp")
+prob.solve()
+print("Status: ", LpStatus[prob.status])
+
+blend_cost = 0
+pb_volume = 0 
+pb_density = 0
+pb_sulphur = 0
+
+for v in prob.variables():
+    print(v.name, "=", v.varValue)
+    blend_cost = lpSum([prices[v]*v.varValue])
+    pb_volume += lpSum([v.varValue])
+for v in prob.variables():
+    pb_density += lpSum([densities[v]*v.varValue])/pb_volume
+    pb_sulphur += lpSum([sulphur[v]*v.varValue])/pb_volume
+
+# Total Blending Revenue
+pb_value = value(prob.objective)
+blending_revenue = pb_value - blend_cost
+print("The Post Blend Stream Volume is:", pb_volume)
+print("The Post-Blend Stream Density", pb_density)
+print("The Post-Blend Stream Sulphur", pb_sulphur)
+print()
+print("Total Blend cost = ", blend_cost)
+print("Post Blend Value = " , pb_value)
+print("Total Blending Revenue" , blending_revenue)
+
+var_list = [solver.NumVar(0.0, value, key) for key, value in dictionary.items()]
